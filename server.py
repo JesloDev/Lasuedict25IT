@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify, session
 from flask_mysqldb import MySQL
 from flask_cors import CORS
-from waitress import serve
 import os
+# from waitress import serve
+
 
 app = Flask(__name__)
 app.secret_key = '!@#$%^&*()1234567890qwertyUIOP'  # Use a secure key in production
@@ -17,6 +18,13 @@ app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', 'agsf1234')
 app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'if0_39384912_lasuedict25it')
 
 mysql = MySQL(app)
+
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({
+        "message": "Welcome to the Flask API home page",
+        "status": "API is running"
+    }), 200
 
 @app.route('/api/receipt_reg', methods=['POST'])
 def receipt_reg():
@@ -117,6 +125,6 @@ def record():
 
 # if __name__ == '__main__':
 #     app.run(debug=True)
-if __name__ == '__main__':
-    # Use Waitress to serve the Flask app on all interfaces, port 5000
-    serve(app, host='0.0.0.0', port=5000)
+# if __name__ == '__main__':
+#     # Use Waitress to serve the Flask app on all interfaces, port 5000
+#     serve(app, host='0.0.0.0', port=5000)
