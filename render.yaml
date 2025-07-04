@@ -1,10 +1,24 @@
+# Exported from Render on 2025-07-04T11:37:39Z
 services:
-  - type: web
-    name: flask-app
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn server:app
-    envVars:
-      - key: FLASK_ENV
-        value: production
+- type: web
+  name: Lasuedict25IT
+  runtime: python
+  repo: https://github.com/JesloDev/Lasuedict25IT
+  branch: master
+  plan: free
+  envVars:
+  - key: SECRET_KEY
+    sync: false
+  - key: MYSQL_DB
+    sync: false
+  - key: MYSQL_PASSWORD
+    sync: false
+  - key: MYSQL_USER
+    sync: false
+  - key: MYSQL_HOST
+    sync: false
+  region: oregon
+  buildCommand: pip install -r requirements.txt
+  startCommand: gunicorn server:app
+  autoDeployTrigger: commit
+version: "1"
