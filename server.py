@@ -26,7 +26,7 @@ def home():
         "status": "API is running"
     }), 200
 
-@app.route('/api/receipt_reg', methods=['POST'])
+@app.route('/api/receipt_reg', methods=['GET', 'POST'])
 def receipt_reg():
     data = request.json
     first_name = data.get('first_name')
@@ -51,7 +51,7 @@ def receipt_reg():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/login_staff', methods=['POST'])
+@app.route('/api/login_staff', methods=['GET', 'POST'])
 def login_staff():
     data = request.json
     username = data.get('username')
@@ -69,7 +69,7 @@ def login_staff():
     else:
         return jsonify({'error': 'Invalid staff credentials.'}), 401
 
-@app.route('/api/login_admin', methods=['POST'])
+@app.route('/api/login_admin', methods=['GET', 'POST'])
 def login_admin():
     data = request.json
     username = data.get('username')
