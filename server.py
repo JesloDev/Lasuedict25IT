@@ -51,41 +51,24 @@ def receipt_reg():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/login_staff', methods=['GET', 'POST'])
-def login_staff():
+@app.route('/api/login', methods=['GET', 'POST'])
+def login(roles=None):
     data = request.json
-    username = data.get('username')
+    admin_id = data.get('admin_id')
     password = data.get('password')
 
     cursor = mysql.connection.cursor()
-    cursor.execute('SELECT * FROM staff_login WHERE staff_username=%s AND staff_password=%s', (username, password))
+    cursor.execute('SELECT * FROM users WHERE username=%s, Password=%s, roles=%s', (admin_id, password, roles))
     user = cursor.fetchone()
     cursor.close()
 
     if user:
         session['staff_logged_in'] = True
-        session['staff_username'] = username
-        return jsonify({'message': 'Staff login successful!'}), 200
+        session['username'] = admin_id
+        return jsonify({'message': 'Staff login successful!', roles:roles}), 200
     else:
         return jsonify({'error': 'Invalid staff credentials.'}), 401
 
-@app.route('/api/login_admin', methods=['GET', 'POST'])
-def login_admin():
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-
-    cursor = mysql.connection.cursor()
-    cursor.execute('SELECT * FROM admin_login WHERE admin_username=%s AND admin_password=%s', (username, password))
-    user = cursor.fetchone()
-    cursor.close()
-
-    if user:
-        session['admin_logged_in'] = True
-        session['admin_username'] = username
-        return jsonify({'message': 'Admin login successful!'}), 200
-    else:
-        return jsonify({'error': 'Invalid admin credentials.'}), 401
 
 @app.route('/api/receipt_records', methods=['GET'])
 def receipt_records():
@@ -122,6 +105,18 @@ def record():
             # add other columns accordingly
         })
     return jsonify(records_list), 200
+
+@app.route('/api/record/', methods=['GET', 'POST'])
+def record():
+    pass
+
+@app.route('/api/upload', methods=['GET', 'POST'])
+def record():
+    pass
+
+@app.route('/api/tickets', methods=['GET', 'POST'])
+def record():
+    pass
 
 # if __name__ == '__main__':
 #     app.run(debug=True)
