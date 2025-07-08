@@ -166,25 +166,25 @@ def handle_records():
             return jsonify(
                 {'error': 'Invalid or missing JSON data for POST. Content-Type must be application/json.'}), 400
 
-        # Assuming you want to insert 'name' for the new record
-        record_department = data.get('department')
-        if not record_department:
-            return jsonify({'error': 'Missing "department" field for new record.'}), 400
 
+        record_department = data.get('department')
         record_faculty = data.get('faculty')
-        if not record_faculty:
-            return jsonify({'error': 'Missing "faculty" field for new record.'}), 400
+
+        if not record_department or not record_faculty:
+            return jsonify({'error': 'Missing "department" or "faculty" field for new record.'}), 400
 
         try:
             cursor = mysql.connection.cursor()
-            cursor.execute("INSERT INTO record (faculty, department) VALUES (%s, %s)", (record_department,))
+            # Corrected: both faculty and department must be passed in the VALUES tuple
+            cursor.execute("INSERT INTO record (faculty, department) VALUES (%s, %s)",
+                           (record_faculty, record_department))
             mysql.connection.commit()
             cursor.close()
-            return jsonify({'message': 'Record added successfully!', 'name': record_department}), 201
+            return jsonify({'message': 'Record added successfully!', 'faculty': record_faculty,
+                            'department': record_department}), 201
         except Exception as e:
             print(f"Database error adding record: {e}")
             return jsonify({'error': f'Failed to add record: {str(e)}'}), 500
-
 
 @app.route('/api/upload', methods=['POST'])
 def handle_upload_json_array():
