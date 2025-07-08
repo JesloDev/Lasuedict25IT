@@ -37,7 +37,7 @@ def home():
     }), 200
 
 
-@app.route('/api/receipt_reg', methods=['GET', 'POST'])
+@app.route('/api/receipt_reg', methods=['POST'])
 def receipt_registration():
     """
     Handles registration for receipts, inserting data into the receipt_reg table.
@@ -133,7 +133,7 @@ def get_receipt_records():
     """
     try:
         cursor = mysql.connection.cursor()
-        cursor.execute("SELECT first_name, last_name, other_name, matric_number, email, phone_number FROM receipt_reg")
+        cursor.execute("SELECT * FROM receipt_reg")
         records = cursor.fetchall()  # Returns list of dicts because of DictCursor
         cursor.close()
         return jsonify(records), 200
@@ -186,7 +186,7 @@ def handle_records():
             print(f"Database error adding record: {e}")
             return jsonify({'error': f'Failed to add record: {str(e)}'}), 500
 
-@app.route('/api/upload', methods=['GET', 'POST'])
+@app.route('/api/upload', methods=['POST'])
 def handle_upload_json_array():
     """
     Receives a JSON array from the front-end and saves each item into the database.
@@ -231,7 +231,7 @@ def get_tickets():
     """
     try:
         cursor = mysql.connection.cursor()
-        cursor.execute("SELECT * FROM tickets")  # Adjust columns as needed
+        cursor.execute("SELECT * FROM ticket")  # Adjust columns as needed
         tickets = cursor.fetchall()  # Returns list of dicts if using DictCursor
         cursor.close()
 
