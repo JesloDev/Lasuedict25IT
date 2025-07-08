@@ -129,7 +129,7 @@ def user_login():
 @app.route('/api/receipt_records', methods=['GET'])
 def get_receipt_records():
     """
-    Retrieves all records from the receipt_reg table.
+    Retrieves all records from the receipt_reg table and returns them as JSON.
     """
     try:
         cursor = mysql.connection.cursor()
