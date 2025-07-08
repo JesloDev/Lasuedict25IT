@@ -167,20 +167,20 @@ def handle_records():
                 {'error': 'Invalid or missing JSON data for POST. Content-Type must be application/json.'}), 400
 
         # Assuming you want to insert 'name' for the new record
-        record_token = data.get('token')
-        if not record_token:
-            return jsonify({'error': 'Missing "token" field for new record.'}), 400
+        record_department = data.get('department')
+        if not record_department:
+            return jsonify({'error': 'Missing "department" field for new record.'}), 400
 
-        record_token_id = data.get('token_id')
-        if not record_token_id:
-            return jsonify({'error': 'Missing "token id" field for new record.'}), 400
+        record_faculty = data.get('faculty')
+        if not record_faculty:
+            return jsonify({'error': 'Missing "faculty" field for new record.'}), 400
 
         try:
             cursor = mysql.connection.cursor()
-            cursor.execute("INSERT INTO record (token, token_id) VALUES (%s, %s)", (record_token,))
+            cursor.execute("INSERT INTO record (faculty, department) VALUES (%s, %s)", (record_department,))
             mysql.connection.commit()
             cursor.close()
-            return jsonify({'message': 'Record added successfully!', 'name': record_token}), 201
+            return jsonify({'message': 'Record added successfully!', 'name': record_department}), 201
         except Exception as e:
             print(f"Database error adding record: {e}")
             return jsonify({'error': f'Failed to add record: {str(e)}'}), 500
@@ -212,9 +212,9 @@ def handle_upload_json_array():
             usage = item['usage']
             cursor.execute(
                 '''
-                INSERT INTO uploads (token, token_id, usage) VALUES (%s, %s, %s)
+                INSERT INTO ticket (token_id, token, usage) VALUES (%s, %s, %s)
                 ''',
-                (token, token_id, usage)
+                (token_id, token, usage)
             )
         mysql.connection.commit()
         cursor.close()
@@ -224,20 +224,21 @@ def handle_upload_json_array():
         return jsonify({'error': f'Failed to save data: {str(e)}'}), 500
 
 
-@app.route('/api/tickets', methods=['GET', 'POST'])
-def handle_tickets():
+@app.route('/api/tickets', methods=['GET'])
+def get_tickets():
     """
-    Placeholder for ticket management logic (GET to list, POST to create).
+    Fetch all tickets from the database and return as JSON.
     """
-    if request.method == 'GET':
-        # Logic to fetch and return a list of tickets
-        return jsonify([{"id": 1, "subject": "Issue A"}, {"id": 2, "subject": "Problem B"}]), 200
-    elif request.method == 'POST':
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'Invalid or missing JSON data for ticket creation.'}), 400
-        # Logic to create a new ticket from 'data'
-        return jsonify({'message': 'Ticket created successfully (placeholder).', 'data_received': data}), 201
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT * FROM tickets")  # Adjust columns as needed
+        tickets = cursor.fetchall()  # Returns list of dicts if using DictCursor
+        cursor.close()
+
+        return jsonify(tickets), 200
+    except Exception as e:
+        print(f"Database error fetching tickets: {e}")
+        return jsonify({'error': f'Failed to retrieve tickets: {str(e)}'}), 500
 
 
 # --- Main execution block for local development ---
