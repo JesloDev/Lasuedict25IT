@@ -80,50 +80,43 @@ def receipt_registration():
         return jsonify({'error': f'Database operation failed: {str(e)}'}), 500
 
 
-@app.route('/api/login', methods=['GET', 'POST'])
+@app.route('/api/login', methods=['POST'])
 def user_login():
-    """
-    Handles user login (staff/admin) based on username, password, and roles.
-    Expects JSON with admin_id (username), password, and roles.
-    """
     data = request.get_json()
 
     if not data:
-        return jsonify({'error': 'Invalid or missing JSON data. Content-Type must be application/json.'}), 400
+        return jsonify({'error': 'Invalid or missing JSON data.'}), 400
 
-    username = data.get('admin_id')  # Renamed from admin_id to be more generic for username
+    username = data.get('username')
     password = data.get('password')
-    roles = data.get('roles')  # e.g., 'staff' or 'admin'
+    role = data.get('role')
 
-    if not all([username, password, roles]):
-        return jsonify({'error': 'Missing required fields (admin_id/username, password, roles).'}), 400
+    if not all([username, password, role]):
+        return jsonify({'error': 'Missing required fields.'}), 400
 
     try:
         cursor = mysql.connection.cursor()
-        # Query the 'users' table, assuming it has columns: username, password, roles
         cursor.execute(
-            'SELECT username, roles FROM users WHERE username=%s AND Password=%s AND roles=%s',
-            (username, password, roles)
+            'SELECT username, Password, role FROM users WHERE username=%s AND Password=%s AND role=%s',
+            (username, password, role)
         )
-        user = cursor.fetchone()  # Fetches a dictionary if MYSQL_CURSORCLASS is DictCursor
+        user = cursor.fetchone()
         cursor.close()
 
         if user:
-            # Store login status and user info in session
             session['logged_in'] = True
             session['username'] = user['username']
-            session['roles'] = user['roles']  # Store roles from DB
-
+            session['role'] = user['role']
             return jsonify({
-                'message': f'{roles} login successful!',
+                'message': f'{role} login successful!',
                 'username': user['username'],
-                'roles': user['roles']
+                'role': user['role']
             }), 200
         else:
             return jsonify({'error': 'Invalid credentials or role.'}), 401
     except Exception as e:
         print(f"Database error during login: {e}")
-        return jsonify({'error': f'An internal server error occurred: {str(e)}'}), 500
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
 
 @app.route('/api/receipt_records', methods=['GET'])
