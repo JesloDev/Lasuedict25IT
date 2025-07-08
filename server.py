@@ -37,7 +37,7 @@ def home():
     }), 200
 
 
-@app.route('/api/receipt_reg', methods=['POST'])
+@app.route('/api/receipt_reg', methods=['GET', 'POST'])
 def receipt_registration():
     """
     Handles registration for receipts, inserting data into the receipt_reg table.
@@ -80,7 +80,7 @@ def receipt_registration():
         return jsonify({'error': f'Database operation failed: {str(e)}'}), 500
 
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/login', methods=['GET', 'POST'])
 def user_login():
     """
     Handles user login (staff/admin) based on username, password, and roles.
@@ -186,7 +186,7 @@ def handle_records():
             print(f"Database error adding record: {e}")
             return jsonify({'error': f'Failed to add record: {str(e)}'}), 500
 
-@app.route('/api/upload', methods=['POST'])
+@app.route('/api/upload', methods=['GET', 'POST'])
 def handle_upload_json_array():
     """
     Receives a JSON array from the front-end and saves each item into the database.
