@@ -9,7 +9,7 @@ services:
     region: oregon
 
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app  # Assuming your Flask app is in app.py
+    startCommand: gunicorn server:app  # Assuming your Flask app is in app.py
 
     envVars:
       - key: SECRET_KEY
