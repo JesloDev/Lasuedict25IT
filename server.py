@@ -187,7 +187,23 @@ def get_receipt_records():
 @app.route('/api/record', methods=['GET'])
 def handle_record_log():
     try:
-        records = Record.query.order_by(Record.timestamp.desc()).all()
+        # Optional: Add query parameters for pagination/filtering
+        page = request.args.get('page', default=1, type=int)
+        per_page = request.args.get('per_page', default=20, type=int)
+
+        # Optional: filter by source (e.g., ?source=login)
+        source_filter = request.args.get('source', type=str)
+
+        query = Record.query
+
+        if source_filter:
+            query = query.filter(Record.source == source_filter)
+
+        # Order by descending timestamp (latest first)
+        paginated = query.order_by(Record.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+        records = paginated.items
+
         result = [{
             'id': r.id,
             'first_name': r.first_name,
@@ -196,18 +212,29 @@ def handle_record_log():
             'matric_number': r.matric_number,
             'email': r.email,
             'phone_number': r.phone_number,
+            'faculty': r.faculty,
+            'department': r.department,
+            'level': r.level,
             'username': r.username,
             'role': r.role,
-            'token': r.token,
             'token_id': r.token_id,
-            'usage': r.usage,
+            'token': r.token,
+            'usage': r.usage.value if hasattr(r.usage, 'value') else r.usage,  # for enum support
             'source': r.source,
-            'timestamp': r.timestamp
+            'timestamp': r.timestamp.isoformat() if r.timestamp else None
         } for r in records]
-        return jsonify(result), 200
+
+        # Include pagination info
+        return jsonify({
+            'page': page,
+            'per_page': per_page,
+            'total': paginated.total,
+            'pages': paginated.pages,
+            'records': result
+        }), 200
+
     except Exception as e:
         return jsonify({'error': f'Failed to retrieve record log: {str(e)}'}), 500
-
 
 @app.route('/api/upload', methods=['POST'])
 def handle_upload_json_array():
