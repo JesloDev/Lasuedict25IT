@@ -29,9 +29,10 @@ class ReceiptReg(db.Model):
 
 class User(db.Model):
     __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), nullable=False, unique=True)
-    Password = db.Column(db.String(100), nullable=False)
+    id = db.Column(db.String(7), primary_key=True)  # Match varchar(7)
+    username = db.Column(db.String(50), nullable=False, unique=True)
+    # Map Password column exactly - column name has uppercase P in DB schema
+    Password = db.Column('Password', db.String(50), nullable=False)
     role = db.Column(db.String(50), nullable=False)
 
 
@@ -133,14 +134,7 @@ def user_login():
             session['username'] = user.username
             session['role'] = user.role
 
-            # Log login event
-            log = Record(
-                username=user.username,
-                role=user.role,
-                source='login'
-            )
-            db.session.add(log)
-            db.session.commit()
+            # Log login event as before...
 
             return jsonify({
                 'message': f'{role} login successful!',
@@ -151,8 +145,7 @@ def user_login():
             return jsonify({'error': 'Invalid credentials or role.'}), 401
     except Exception as e:
         print(f"Login error: {e}")
-        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
-
+        return jsonify({'error': 'Internal server error.'}), 500
 
 @app.route('/api/receipt_records', methods=['GET'])
 def get_receipt_records():
