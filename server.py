@@ -38,6 +38,7 @@ class User(db.Model):
 
 class Record(db.Model):
     __tablename__ = 'record'
+
     id = db.Column(db.Integer, primary_key=True)
 
     # From ReceiptReg
@@ -47,6 +48,11 @@ class Record(db.Model):
     matric_number = db.Column(db.String(100))
     email = db.Column(db.String(100))
     phone_number = db.Column(db.String(20))
+
+    # New fields
+    faculty = db.Column(db.String(100))
+    department = db.Column(db.String(100))
+    level = db.Column(db.String(20))
 
     # From User Login
     username = db.Column(db.String(100))
@@ -58,7 +64,7 @@ class Record(db.Model):
     usage = db.Column(db.String(100))
 
     # Meta
-    source = db.Column(db.String(50))  # e.g., 'receipt_reg', 'login', 'upload'
+    source = db.Column(db.String(50))
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
 
