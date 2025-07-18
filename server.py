@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import os
+import enum
+from sqlalchemy.dialects.postgresql import ENUM
+
 
 # --- App Initialization ---
 app = Flask(__name__)
@@ -68,12 +71,21 @@ class Record(db.Model):
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class UsageEnum(enum.Enum):
+    available = 'available'
+    assigned = 'assigned'
+
 class Ticket(db.Model):
     __tablename__ = 'ticket'
-    id = db.Column(db.Integer, primary_key=True)
+
+    id = db.Column(db.Integer, nullable=False)
     token_id = db.Column(db.String(150), nullable=False)
     token = db.Column(db.String(150), nullable=False)
-    usage = db.Column(db.String(100), nullable=False)
+    usage = db.Column(ENUM(UsageEnum, name='usage_enum', create_type=False), nullable=False)
+
+    __table_args__ = (
+        db.PrimaryKeyConstraint('id', 'token'),
+    )
 
 
 # --- Routes ---
