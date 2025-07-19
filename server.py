@@ -1,38 +1,65 @@
 from flask import Flask, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
 import os
 import enum
 from sqlalchemy.dialects.postgresql import ENUM
+from werkzeug.security import generate_password_hash, check_password_hash
+from marshmallow import Schema, fields, validate, ValidationError
+from marshmallow import EXCLUDE
 
 # --- App Initialization ---
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', '!@#$%^&*()1234567890qwertyUIOP')
 
 # --- Database Configuration ---
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # e.g. postgresql://user:pass@host/db
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///dev.db')  # fallback for dev
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+# cors = CORS(app, origins=["https://your-frontend-domain.com"])  # restrict to actual frontend domain
+# cors = CORS(app, origins=["https://your-frontend-domain.com"])  # restrict to your frontend domain
 CORS(app)
 
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'user_login'
+
 # --- Models ---
+class UsageEnum(enum.Enum):
+    available = 'available'
+    assigned = 'assigned'
+
 class ReceiptReg(db.Model):
     __tablename__ = 'receipt_reg'
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     other_name = db.Column(db.String(100), default='')
-    matric_number = db.Column(db.String(100), nullable=False)
+    matric_number = db.Column(db.String(100), nullable=False, unique=True)
     email = db.Column(db.String(100), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.String(7), primary_key=True)
     username = db.Column(db.String(50), nullable=False, unique=True)
-    Password = db.Column('Password', db.String(50), nullable=False)
+    password_hash = db.Column('Password', db.String(128), nullable=False)  # hashed password
     role = db.Column(db.String(50), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def get_id(self):
+        return self.id
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(user_id)
 
 class Record(db.Model):
     __tablename__ = 'record'
@@ -52,10 +79,6 @@ class Record(db.Model):
     department = db.Column(db.String(100))
     level = db.Column(db.String(20))
 
-    # From User Login
-    username = db.Column(db.String(100))
-    role = db.Column(db.String(50))
-
     # From Ticket
     token_id = db.Column(db.String(150))
     token = db.Column(db.String(150))
@@ -65,14 +88,10 @@ class Record(db.Model):
     source = db.Column(db.String(50))
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
-class UsageEnum(enum.Enum):
-    available = 'available'
-    assigned = 'assigned'
-
 class Ticket(db.Model):
     __tablename__ = 'ticket'
 
-    id = db.Column(db.Integer, nullable=False)
+    id = db.Column(db.Integer, nullable=False, autoincrement=True)
     token_id = db.Column(db.String(150), nullable=False)
     token = db.Column(db.String(150), nullable=False)
     usage = db.Column(ENUM(UsageEnum, name='usage_enum', create_type=False), nullable=False)
@@ -81,7 +100,66 @@ class Ticket(db.Model):
         db.PrimaryKeyConstraint('id', 'token'),
     )
 
-# --- Routes ---
+# --- Schemas ---
+# (same as previous code: ReceiptRegSchema, UserLoginSchema, RecordMetadataUpdateSchema, AssignTokenSchema, UploadTicketItemSchema)
+# --- Schemas for validation ---
+class ReceiptRegSchema(Schema):
+    first_name = fields.Str(required=True, validate=validate.Length(min=1))
+    last_name = fields.Str(required=True, validate=validate.Length(min=1))
+    other_name = fields.Str()
+    matric_number = fields.Str(required=True, validate=validate.Length(min=1))
+    email = fields.Email(required=True)
+    phone_number = fields.Str(required=True, validate=validate.Length(min=7))
+
+
+class UserLoginSchema(Schema):
+    username = fields.Str(required=True)
+    password = fields.Str(required=True)
+    role = fields.Str(required=True)
+
+
+class RecordMetadataUpdateSchema(Schema):
+    id = fields.Int(required=True)
+    faculty = fields.Str(required=True)
+    department = fields.Str(required=True)
+    level = fields.Str(required=True)
+
+
+class AssignTokenSchema(Schema):
+    matric_number = fields.Str(required=True)
+    token = fields.Str(required=True)
+
+
+class UploadTicketItemSchema(Schema):
+    token_id = fields.Str(required=True)
+    token = fields.Str(required=True)
+    usage = fields.Str(required=True, validate=validate.OneOf([e.value for e in UsageEnum]))
+
+
+class RecordUpdateSchema(Schema):
+    # all fields in the Record model
+    id = fields.Int(required=True)
+    first_name = fields.Str()
+    last_name = fields.Str()
+    other_name = fields.Str(allow_none=True)
+    matric_number = fields.Str()
+    email = fields.Email()
+    phone_number = fields.Str()
+    faculty = fields.Str(allow_none=True)
+    department = fields.Str(allow_none=True)
+    level = fields.Str(allow_none=True)
+    token_id = fields.Str(allow_none=True)
+    token = fields.Str(allow_none=True)
+    usage = fields.Str(allow_none=True)
+    source = fields.Str(allow_none=True)
+
+    class Meta:
+        unknown = EXCLUDE  # ignore unknown fields that are not defined
+
+
+# For brevity, not repeating schemas here: use as before
+
+# --- Routes and views ---
 
 @app.route('/', methods=['GET'])
 def home():
@@ -89,78 +167,82 @@ def home():
 
 @app.route('/api/receipt_reg', methods=['POST'])
 def receipt_registration():
-    data = request.get_json()
-    required_fields = ['first_name', 'last_name', 'matric_number', 'email', 'phone_number']
+    json_data = request.get_json()
+    try:
+        validated_data = ReceiptRegSchema().load(json_data)
+    except ValidationError as err:
+        return jsonify({'error': err.messages}), 400
 
-    if not all(field in data for field in required_fields):
-        return jsonify({'error': 'Missing required fields.'}), 400
+    if ReceiptReg.query.filter_by(matric_number=validated_data['matric_number']).first():
+        return jsonify({'error': 'Matric number already registered.'}), 409
 
     try:
-        reg = ReceiptReg(
-            first_name=data['first_name'],
-            last_name=data['last_name'],
-            other_name=data.get('other_name', ''),
-            matric_number=data['matric_number'],
-            email=data['email'],
-            phone_number=data['phone_number']
-        )
+        reg = ReceiptReg(**validated_data)
         db.session.add(reg)
-
-        log = Record(
-            first_name=data['first_name'],
-            last_name=data['last_name'],
-            other_name=data.get('other_name', ''),
-            matric_number=data['matric_number'],
-            email=data['email'],
-            phone_number=data['phone_number'],
+        record = Record(
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            other_name=validated_data.get('other_name',''),
+            matric_number=validated_data['matric_number'],
+            email=validated_data['email'],
+            phone_number=validated_data['phone_number'],
             source='receipt_reg'
         )
-        db.session.add(log)
-
+        db.session.add(record)
         db.session.commit()
-        return jsonify({'message': 'Registration successful!'}), 201
+
+        return jsonify({
+            'message': 'Registration successful!',
+            'receipt': {
+                'id': reg.id,
+                'first_name': reg.first_name,
+                'last_name': reg.last_name,
+                'other_name': reg.other_name,
+                'matric_number': reg.matric_number,
+                'email': reg.email,
+                'phone_number': reg.phone_number
+            }
+        }), 201
     except Exception as e:
         db.session.rollback()
-        print(f"Error: {e}")
+        app.logger.error(f"Database operation failed: {e}")
         return jsonify({'error': 'Database operation failed.'}), 500
 
 @app.route('/api/login', methods=['POST'])
 def user_login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    role = data.get('role')
-
-    if not all([username, password, role]):
-        return jsonify({'error': 'Missing required fields.'}), 400
-
+    json_data = request.get_json()
     try:
-        user = User.query.filter_by(username=username, Password=password, role=role).first()
-        if user:
-            session['logged_in'] = True
-            session['username'] = user.username
-            session['role'] = user.role
+        validated_data = UserLoginSchema().load(json_data)
+    except ValidationError as err:
+        return jsonify({'error': err.messages}), 400
 
-            log = Record(
-                username=user.username,
-                role=user.role,
-                source='login'
-            )
+    user = User.query.filter_by(username=validated_data['username'], role=validated_data['role']).first()
+    if user and user.check_password(validated_data['password']):
+        login_user(user)
+        # Log login event without username or role in record
+        try:
+            log = Record(source='login')
             db.session.add(log)
             db.session.commit()
+        except Exception as e:
+            app.logger.error(f"Failed to log login event: {e}")
 
-            return jsonify({
-                'message': f'{role} login successful!',
-                'username': user.username,
-                'role': user.role
-            }), 200
-        else:
-            return jsonify({'error': 'Invalid credentials or role.'}), 401
-    except Exception as e:
-        print(f"Login error: {e}")
-        return jsonify({'error': 'Internal server error.'}), 500
+        return jsonify({
+            'message': f"{user.role} login successful",
+            'username': user.username,
+            'role': user.role
+        }), 200
+
+    return jsonify({'error': 'Invalid credentials or role.'}), 401
+
+@app.route('/api/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'message': 'Logged out successfully'}), 200
 
 @app.route('/api/receipt_records', methods=['GET'])
+@login_required
 def get_receipt_records():
     try:
         records = ReceiptReg.query.all()
@@ -175,24 +257,23 @@ def get_receipt_records():
         } for r in records]
         return jsonify(result), 200
     except Exception as e:
-        print(f"Error fetching receipts: {e}")
+        app.logger.error(f"Error fetching receipts: {e}")
         return jsonify({'error': 'Failed to retrieve receipt records.'}), 500
 
 @app.route('/api/record', methods=['GET'])
+@login_required
 def handle_record_log():
+    page = request.args.get('page', default=1, type=int)
+    per_page = request.args.get('per_page', default=20, type=int)
+    source = request.args.get('source', type=str)
+
     try:
-        page = request.args.get('page', default=1, type=int)
-        per_page = request.args.get('per_page', default=20, type=int)
-        source_filter = request.args.get('source', type=str)
-
         query = Record.query
-        if source_filter:
-            query = query.filter(Record.source == source_filter)
-        paginated = query.order_by(Record.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
-
-        records = paginated.items
-
-        result = [{
+        if source:
+            query = query.filter(Record.source==source)
+        pagination = query.order_by(Record.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+        records = pagination.items
+        data = [{
             'id': r.id,
             'first_name': r.first_name,
             'last_name': r.last_name,
@@ -203,94 +284,154 @@ def handle_record_log():
             'faculty': r.faculty,
             'department': r.department,
             'level': r.level,
-            'username': r.username,
-            'role': r.role,
             'token_id': r.token_id,
             'token': r.token,
-            'usage': r.usage.value if hasattr(r.usage, 'value') else r.usage,
+            'usage': r.usage,
             'source': r.source,
             'timestamp': r.timestamp.isoformat() if r.timestamp else None
         } for r in records]
-
         return jsonify({
             'page': page,
             'per_page': per_page,
-            'total': paginated.total,
-            'pages': paginated.pages,
-            'records': result
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'records': data
         }), 200
-
     except Exception as e:
-        return jsonify({'error': f'Failed to retrieve record log: {str(e)}'}), 500
+        app.logger.error(f'Failed to retrieve record log: {e}')
+        return jsonify({'error': 'Failed to retrieve record log.'}), 500
 
-
-@app.route('/api/record/update_metadata', methods=['POST'])
+@app.route('/api/record/update_metadata', methods=['PUT'])
+@login_required
 def update_record_metadata():
-    data = request.get_json()
+    json_data = request.get_json()
+    try:
+        validated = RecordUpdateSchema().load(json_data)
+    except ValidationError as err:
+        return jsonify({'error': err.messages}), 400
 
-    required_fields = ['id', 'faculty', 'department', 'level']
-    if not all(field in data for field in required_fields):
-        return jsonify({'error': 'Missing required fields: id, faculty, department, level.'}), 400
+    record = Record.query.get(validated['id'])
+    if not record:
+        return jsonify({'error': f'Record with id {validated["id"]} not found.'}), 404
 
     try:
-        record_id = data['id']
-
-        # Retrieve the record by ID
-        record = Record.query.get(record_id)
-
-        if not record:
-            return jsonify({'error': f'Record with ID {record_id} not found.'}), 404
-
-        # Update fields
-        record.faculty = data['faculty']
-        record.department = data['department']
-        record.level = data['level']
-
+        # Update only the keys in validated data (excluding 'id')
+        for key, value in validated.items():
+            if key != 'id':
+                setattr(record, key, value)
         db.session.commit()
-
-        return jsonify({'message': 'Record metadata updated successfully.', 'id': record.id}), 200
-
     except Exception as e:
         db.session.rollback()
-        print(f"Update error: {e}")
-        return jsonify({'error': f'Failed to update record: {str(e)}'}), 500
+        app.logger.error(f"Failed to update record metadata: {e}")
+        return jsonify({'error': 'Failed to update record metadata.'}), 500
 
+    # Serialize updated record for response
+    updated = {field: getattr(record, field) for field in validated.keys() if field != "id"}
+    updated['id'] = record.id
+
+    return jsonify({
+        'message': 'Record updated successfully.',
+        'updated_record': updated
+    }), 200
 
 @app.route('/api/upload', methods=['POST'])
+@login_required
 def handle_upload_json_array():
-    data = request.get_json()
-
-    if not isinstance(data, list):
+    json_data = request.get_json()
+    if not isinstance(json_data, list):
         return jsonify({'error': 'Request body must be a JSON array.'}), 400
-
+    schema = UploadTicketItemSchema()
+    errors = []
+    valid_items = []
+    for idx, item in enumerate(json_data):
+        try:
+            validated = schema.load(item)
+            valid_items.append(validated)
+        except ValidationError as e:
+            errors.append({'index': idx, 'errors': e.messages})
+    if errors:
+        return jsonify({'validation_errors': errors}), 400
     try:
-        for item in data:
-            if not all(key in item for key in ('token', 'token_id', 'usage')):
-                return jsonify({'error': 'Invalid item in array. Each must include token, token_id, usage.'}), 400
-
-            ticket = Ticket(token_id=item['token_id'], token=item['token'], usage=item['usage'])
+        saved_tickets = []
+        for item in valid_items:
+            ticket = Ticket(token_id=item['token_id'], token=item['token'], usage=UsageEnum(item['usage']))
             db.session.add(ticket)
-
             log = Record(token_id=item['token_id'], token=item['token'], usage=item['usage'], source='upload')
             db.session.add(log)
-
+            saved_tickets.append({
+                'token_id': ticket.token_id,
+                'token': ticket.token,
+                'usage': ticket.usage.value
+            })
         db.session.commit()
-        return jsonify({'message': f'Successfully saved {len(data)} tickets!'}), 201
     except Exception as e:
         db.session.rollback()
-        print(f"Upload error: {e}")
-        return jsonify({'error': f'Failed to save data: {str(e)}'}), 500
+        app.logger.error(f"Upload error: {e}")
+        return jsonify({'error': 'Failed to save data.'}), 500
+    return jsonify({
+        'message': f'Successfully saved {len(saved_tickets)} tickets!',
+        'tickets': saved_tickets
+    }), 201
 
 @app.route('/api/tickets', methods=['GET'])
+@login_required
 def get_tickets():
     try:
         tickets = Ticket.query.all()
-        result = [{'id': t.id, 'token_id': t.token_id, 'token': t.token, 'usage': t.usage.value if hasattr(t.usage, "value") else t.usage} for t in tickets]
-        return jsonify(result), 200
+        data = [{
+            'id': t.id,
+            'token_id': t.token_id,
+            'token': t.token,
+            'usage': t.usage.value
+        } for t in tickets]
+        return jsonify(data), 200
     except Exception as e:
-        print(f"Ticket fetch error: {e}")
+        app.logger.error(f"Ticket fetch error: {e}")
         return jsonify({'error': 'Failed to retrieve tickets.'}), 500
 
-# --- Run the App (for local dev) ---
+@app.route('/api/assign', methods=['POST'])
+@login_required
+def assign_token_to_matric():
+    json_data = request.get_json()
+    try:
+        validated = AssignTokenSchema().load(json_data)
+    except ValidationError as err:
+        return jsonify({'error': err.messages}), 400
+    matric_number = validated['matric_number']
+    token_value = validated['token']
+    ticket = Ticket.query.filter_by(token=token_value).first()
+    if not ticket:
+        return jsonify({'error': f'Token "{token_value}" not found.'}), 404
+    record = Record.query.filter_by(token=token_value, matric_number=matric_number).first()
+    if not record:
+        return jsonify({'error': f'No matching record for token "{token_value}" and matric number "{matric_number}" found.'}), 404
+    try:
+        ticket.usage = UsageEnum.assigned
+        record.usage = 'assigned'
+        record.source = 'assign'
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Assign error: {e}")
+        return jsonify({'error': 'Failed to assign token.'}), 500
+    return jsonify({
+        'message': f'Token "{token_value}" assigned to matric number "{matric_number}".',
+        'updated_ticket': {
+            'token_id': ticket.token_id,
+            'token': ticket.token,
+            'usage': ticket.usage.value
+        },
+        'updated_record': {
+            'id': record.id,
+            'matric_number': record.matric_number,
+            'usage': record.usage,
+            'token': record.token,
+            'token_id': record.token_id,
+            'source': record.source,
+            'timestamp': record.timestamp.isoformat() if record.timestamp else None
+        }
+    }), 200
+
+# # --- Run app ---
 # if __name__ == '__main__':
 #     app.run(debug=True)
