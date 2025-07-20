@@ -208,17 +208,26 @@ def receipt_registration():
         app.logger.error(f"Database operation failed: {e}")
         return jsonify({'error': 'Database operation failed.'}), 500
 
+
 @app.route('/api/login', methods=['POST'])
 def user_login():
     json_data = request.get_json()
+    if not json_data:
+        return jsonify({'error': 'No input data provided'}), 400
+
     try:
         validated_data = UserLoginSchema().load(json_data)
     except ValidationError as err:
         return jsonify({'error': err.messages}), 400
 
-    user = User.query.filter_by(username=validated_data['username'], role=validated_data['role']).first()
+    user = User.query.filter_by(
+        username=validated_data['username'],
+        role=validated_data['role']
+    ).first()
+
     if user and user.check_password(validated_data['password']):
         login_user(user)
+
         # Log login event without username or role in record
         try:
             log = Record(source='login')
@@ -233,7 +242,8 @@ def user_login():
             'role': user.role
         }), 200
 
-    return jsonify({'error': 'Invalid credentials or role.'}), 401
+    return jsonify({'error': 'Invalid username, role or password'}), 401
+
 
 @app.route('/api/logout', methods=['POST'])
 @login_required
