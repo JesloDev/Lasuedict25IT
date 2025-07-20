@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import ENUM
 from werkzeug.security import generate_password_hash, check_password_hash
 from marshmallow import Schema, fields, validate, ValidationError
 from marshmallow import EXCLUDE
+import traceback
 
 # --- App Initialization ---
 app = Flask(__name__)
@@ -19,8 +20,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 # cors = CORS(app, origins=["https://your-frontend-domain.com"])  # restrict to actual frontend domain
-# cors = CORS(app, origins=["https://your-frontend-domain.com"])  # restrict to your frontend domain
-CORS(app)
+CORS(app, origins=["https://lasued-ticketer.vercel.app"])  # restrict to your frontend domain
+# CORS(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -334,6 +335,7 @@ def update_record_metadata():
         'updated_record': updated
     }), 200
 
+
 @app.route('/api/upload', methods=['POST'])
 @login_required
 def handle_upload_json_array():
@@ -367,6 +369,7 @@ def handle_upload_json_array():
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Upload error: {e}")
+        app.logger.error(traceback.format_exc())
         return jsonify({'error': 'Failed to save data.'}), 500
     return jsonify({
         'message': f'Successfully saved {len(saved_tickets)} tickets!',
