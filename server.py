@@ -19,9 +19,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///dev
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-# cors = CORS(app, origins=["https://your-frontend-domain.com"])  # restrict to actual frontend domain
-CORS(app, origins=["https://lasued-ticketer.vercel.app"])  # restrict to your frontend domain
-# CORS(app)
+CORS(app, origins=["https://lasued-ticketer.vercel.app"])
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -98,8 +96,6 @@ class Ticket(db.Model):
     usage = db.Column(db.String(20), nullable=False)
 
 # --- Schemas ---
-# (same as previous code: ReceiptRegSchema, UserLoginSchema, RecordMetadataUpdateSchema, AssignTokenSchema, UploadTicketItemSchema)
-# --- Schemas for validation ---
 class ReceiptRegSchema(Schema):
     first_name = fields.Str(required=True, validate=validate.Length(min=1))
     last_name = fields.Str(required=True, validate=validate.Length(min=1))
@@ -108,12 +104,10 @@ class ReceiptRegSchema(Schema):
     email = fields.Email(required=True)
     phone_number = fields.Str(required=True, validate=validate.Length(min=7))
 
-
 class UserLoginSchema(Schema):
     username = fields.Str(required=True)
     password = fields.Str(required=True)
     role = fields.Str(required=True)
-
 
 class RecordMetadataUpdateSchema(Schema):
     id = fields.Int(required=True)
@@ -121,20 +115,16 @@ class RecordMetadataUpdateSchema(Schema):
     department = fields.Str(required=True)
     level = fields.Str(required=True)
 
-
 class AssignTokenSchema(Schema):
     matric_number = fields.Str(required=True)
     token = fields.Str(required=True)
-
 
 class UploadTicketItemSchema(Schema):
     token_id = fields.Str(required=True)
     token = fields.Str(required=True)
     usage = fields.Str(required=True, validate=validate.OneOf([e.value for e in UsageEnum]))
 
-
 class RecordUpdateSchema(Schema):
-    # all fields in the Record model
     id = fields.Int(required=True)
     first_name = fields.Str()
     last_name = fields.Str()
@@ -151,10 +141,7 @@ class RecordUpdateSchema(Schema):
     source = fields.Str(allow_none=True)
 
     class Meta:
-        unknown = EXCLUDE  # ignore unknown fields that are not defined
-
-
-# For brevity, not repeating schemas here: use as before
+        unknown = EXCLUDE
 
 # --- Routes and views ---
 
@@ -179,7 +166,7 @@ def receipt_registration():
         record = Record(
             first_name=validated_data['first_name'],
             last_name=validated_data['last_name'],
-            other_name=validated_data.get('other_name',''),
+            other_name=validated_data.get('other_name', ''),
             matric_number=validated_data['matric_number'],
             email=validated_data['email'],
             phone_number=validated_data['phone_number'],
@@ -205,7 +192,6 @@ def receipt_registration():
         app.logger.error(f"Database operation failed: {e}")
         return jsonify({'error': 'Database operation failed.'}), 500
 
-
 @app.route('/api/login', methods=['POST'])
 def user_login():
     data = request.get_json()
@@ -230,7 +216,6 @@ def user_login():
         }), 200
 
     return jsonify({'error': 'Invalid credentials'}), 401
-
 
 @app.route('/api/logout', methods=['POST'])
 @login_required
@@ -267,7 +252,7 @@ def handle_record_log():
     try:
         query = Record.query
         if source:
-            query = query.filter(Record.source==source)
+            query = query.filter(Record.source == source)
         pagination = query.order_by(Record.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
         records = pagination.items
         data = [{
@@ -312,7 +297,6 @@ def update_record_metadata():
         return jsonify({'error': f'Record with id {validated["id"]} not found.'}), 404
 
     try:
-        # Update only the keys in validated data (excluding 'id')
         for key, value in validated.items():
             if key != 'id':
                 setattr(record, key, value)
@@ -322,7 +306,6 @@ def update_record_metadata():
         app.logger.error(f"Failed to update record metadata: {e}")
         return jsonify({'error': 'Failed to update record metadata.'}), 500
 
-    # Serialize updated record for response
     updated = {field: getattr(record, field) for field in validated.keys() if field != "id"}
     updated['id'] = record.id
 
@@ -330,7 +313,6 @@ def update_record_metadata():
         'message': 'Record updated successfully.',
         'updated_record': updated
     }), 200
-
 
 @app.route('/api/upload', methods=['POST'])
 @login_required
@@ -352,14 +334,13 @@ def handle_upload_json_array():
     try:
         saved_tickets = []
         for item in valid_items:
-            ticket = Ticket(token_id=item['token_id'], token=item['token'], usage=UsageEnum(item['usage']))
+            # Only add tickets here, no record creation during upload
+            ticket = Ticket(token_id=item['token_id'], token=item['token'], usage=UsageEnum(item['usage']).value)
             db.session.add(ticket)
-            log = Record(token_id=item['token_id'], token=item['token'], usage=item['usage'], source='upload')
-            db.session.add(log)
             saved_tickets.append({
                 'token_id': ticket.token_id,
                 'token': ticket.token,
-                'usage': ticket.usage.value
+                'usage': ticket.usage
             })
         db.session.commit()
     except Exception as e:
@@ -381,7 +362,7 @@ def get_tickets():
             'id': t.id,
             'token_id': t.token_id,
             'token': t.token,
-            'usage': t.usage.value
+            'usage': t.usage
         } for t in tickets]
         return jsonify(data), 200
     except Exception as e:
@@ -396,29 +377,55 @@ def assign_token_to_matric():
         validated = AssignTokenSchema().load(json_data)
     except ValidationError as err:
         return jsonify({'error': err.messages}), 400
+
     matric_number = validated['matric_number']
     token_value = validated['token']
+
     ticket = Ticket.query.filter_by(token=token_value).first()
     if not ticket:
         return jsonify({'error': f'Token "{token_value}" not found.'}), 404
+
     record = Record.query.filter_by(token=token_value, matric_number=matric_number).first()
-    if not record:
-        return jsonify({'error': f'No matching record for token "{token_value}" and matric number "{matric_number}" found.'}), 404
+
     try:
-        ticket.usage = UsageEnum.assigned
-        record.usage = 'assigned'
-        record.source = 'assign'
+        if not record:
+            # Create new record on assignment
+            record = Record(
+                token_id=ticket.token_id,
+                token=ticket.token,
+                usage='assigned',
+                source='assign',
+                matric_number=matric_number,
+                first_name=None,
+                last_name=None,
+                other_name=None,
+                email=None,
+                phone_number=None,
+                faculty=None,
+                department=None,
+                level=None
+            )
+            db.session.add(record)
+        else:
+            # Update existing record usage/source
+            record.usage = 'assigned'
+            record.source = 'assign'
+
+        ticket.usage = UsageEnum.assigned.value
+
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Assign error: {e}")
+        app.logger.error(traceback.format_exc())
         return jsonify({'error': 'Failed to assign token.'}), 500
+
     return jsonify({
         'message': f'Token "{token_value}" assigned to matric number "{matric_number}".',
         'updated_ticket': {
             'token_id': ticket.token_id,
             'token': ticket.token,
-            'usage': ticket.usage.value
+            'usage': ticket.usage
         },
         'updated_record': {
             'id': record.id,
@@ -431,6 +438,6 @@ def assign_token_to_matric():
         }
     }), 200
 
-# # --- Run app ---
+# Uncomment for development/testing
 # if __name__ == '__main__':
 #     app.run(debug=True)
