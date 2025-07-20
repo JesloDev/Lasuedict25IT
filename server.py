@@ -44,8 +44,8 @@ class ReceiptReg(db.Model):
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.String(7), primary_key=True)
-    username = db.Column(db.String(50), nullable=False, unique=True)
-    password_hash = db.Column('Password', db.String(128), nullable=False)  # hashed password
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(50), nullable=False)
 
     def set_password(self, password):
@@ -211,38 +211,28 @@ def receipt_registration():
 
 @app.route('/api/login', methods=['POST'])
 def user_login():
-    json_data = request.get_json()
-    if not json_data:
+    data = request.get_json()
+    if not data:
         return jsonify({'error': 'No input data provided'}), 400
 
-    try:
-        validated_data = UserLoginSchema().load(json_data)
-    except ValidationError as err:
-        return jsonify({'error': err.messages}), 400
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role')
 
-    user = User.query.filter_by(
-        username=validated_data['username'],
-        role=validated_data['role']
-    ).first()
+    if not username or not password or not role:
+        return jsonify({'error': 'Username, password and role are required'}), 400
 
-    if user and user.check_password(validated_data['password']):
+    user = User.query.filter_by(username=username, role=role).first()
+
+    if user and user.check_password(password):
         login_user(user)
-
-        # Log login event without username or role in record
-        try:
-            log = Record(source='login')
-            db.session.add(log)
-            db.session.commit()
-        except Exception as e:
-            app.logger.error(f"Failed to log login event: {e}")
-
         return jsonify({
-            'message': f"{user.role} login successful",
+            'message': 'Login successful',
             'username': user.username,
             'role': user.role
         }), 200
 
-    return jsonify({'error': 'Invalid username, role or password'}), 401
+    return jsonify({'error': 'Invalid credentials'}), 401
 
 
 @app.route('/api/logout', methods=['POST'])
