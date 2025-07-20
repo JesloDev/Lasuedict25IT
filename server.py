@@ -4,7 +4,6 @@ from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
 import os
 import enum
-from sqlalchemy.dialects.postgresql import ENUM
 from werkzeug.security import generate_password_hash, check_password_hash
 from marshmallow import Schema, fields, validate, ValidationError
 from marshmallow import EXCLUDE
@@ -25,10 +24,12 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'user_login'
 
+
 # --- Models ---
 class UsageEnum(enum.Enum):
     available = 'available'
     assigned = 'assigned'
+
 
 class ReceiptReg(db.Model):
     __tablename__ = 'receipt_reg'
@@ -39,6 +40,7 @@ class ReceiptReg(db.Model):
     matric_number = db.Column(db.String(100), nullable=False, unique=True)
     email = db.Column(db.String(100), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
+
 
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
@@ -56,9 +58,11 @@ class User(db.Model, UserMixin):
     def get_id(self):
         return self.id
 
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(user_id)
+
 
 class Record(db.Model):
     __tablename__ = 'record'
@@ -87,13 +91,14 @@ class Record(db.Model):
     source = db.Column(db.String(50))
     timestamp = db.Column(db.DateTime, server_default=db.func.now())
 
+
 class Ticket(db.Model):
     __tablename__ = 'ticket'
 
     token = db.Column(db.String(150), primary_key=True)
-    id = db.Column(db.Integer, unique=True, autoincrement=True, nullable=False)
     token_id = db.Column(db.String(150), nullable=False)
     usage = db.Column(db.String(20), nullable=False)
+
 
 # --- Schemas ---
 class ReceiptRegSchema(Schema):
@@ -104,10 +109,12 @@ class ReceiptRegSchema(Schema):
     email = fields.Email(required=True)
     phone_number = fields.Str(required=True, validate=validate.Length(min=7))
 
+
 class UserLoginSchema(Schema):
     username = fields.Str(required=True)
     password = fields.Str(required=True)
     role = fields.Str(required=True)
+
 
 class RecordMetadataUpdateSchema(Schema):
     id = fields.Int(required=True)
@@ -115,14 +122,17 @@ class RecordMetadataUpdateSchema(Schema):
     department = fields.Str(required=True)
     level = fields.Str(required=True)
 
+
 class AssignTokenSchema(Schema):
     matric_number = fields.Str(required=True)
     token = fields.Str(required=True)
+
 
 class UploadTicketItemSchema(Schema):
     token_id = fields.Str(required=True)
     token = fields.Str(required=True)
     usage = fields.Str(required=True, validate=validate.OneOf([e.value for e in UsageEnum]))
+
 
 class RecordUpdateSchema(Schema):
     id = fields.Int(required=True)
@@ -143,11 +153,13 @@ class RecordUpdateSchema(Schema):
     class Meta:
         unknown = EXCLUDE
 
+
 # --- Routes and views ---
 
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({"message": "Welcome to the Flask API home page", "status": "API is running"}), 200
+
 
 @app.route('/api/receipt_reg', methods=['POST'])
 def receipt_registration():
@@ -192,6 +204,7 @@ def receipt_registration():
         app.logger.error(f"Database operation failed: {e}")
         return jsonify({'error': 'Database operation failed.'}), 500
 
+
 @app.route('/api/login', methods=['POST'])
 def user_login():
     data = request.get_json()
@@ -217,11 +230,13 @@ def user_login():
 
     return jsonify({'error': 'Invalid credentials'}), 401
 
+
 @app.route('/api/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()
     return jsonify({'message': 'Logged out successfully'}), 200
+
 
 @app.route('/api/receipt_records', methods=['GET'])
 @login_required
@@ -241,6 +256,7 @@ def get_receipt_records():
     except Exception as e:
         app.logger.error(f"Error fetching receipts: {e}")
         return jsonify({'error': 'Failed to retrieve receipt records.'}), 500
+
 
 @app.route('/api/record', methods=['GET'])
 @login_required
@@ -283,6 +299,7 @@ def handle_record_log():
         app.logger.error(f'Failed to retrieve record log: {e}')
         return jsonify({'error': 'Failed to retrieve record log.'}), 500
 
+
 @app.route('/api/record/update_metadata', methods=['PUT'])
 @login_required
 def update_record_metadata():
@@ -314,6 +331,7 @@ def update_record_metadata():
         'updated_record': updated
     }), 200
 
+
 @app.route('/api/upload', methods=['POST'])
 @login_required
 def handle_upload_json_array():
@@ -334,7 +352,7 @@ def handle_upload_json_array():
     try:
         saved_tickets = []
         for item in valid_items:
-            # Only add tickets here, no record creation during upload
+            # Only add tickets here, no record created on upload
             ticket = Ticket(token_id=item['token_id'], token=item['token'], usage=UsageEnum(item['usage']).value)
             db.session.add(ticket)
             saved_tickets.append({
@@ -353,13 +371,14 @@ def handle_upload_json_array():
         'tickets': saved_tickets
     }), 201
 
+
 @app.route('/api/tickets', methods=['GET'])
 @login_required
 def get_tickets():
     try:
         tickets = Ticket.query.all()
         data = [{
-            'id': t.id,
+            # 'id': t.id, # Removed since id column dropped
             'token_id': t.token_id,
             'token': t.token,
             'usage': t.usage
@@ -368,6 +387,7 @@ def get_tickets():
     except Exception as e:
         app.logger.error(f"Ticket fetch error: {e}")
         return jsonify({'error': 'Failed to retrieve tickets.'}), 500
+
 
 @app.route('/api/assign', methods=['POST'])
 @login_required
@@ -386,14 +406,12 @@ def assign_token_to_matric():
         return jsonify({'error': f'Token "{token_value}" not found.'}), 404
 
     record = Record.query.filter_by(token=token_value, matric_number=matric_number).first()
-
     try:
         if not record:
-            # Create new record on assignment
             record = Record(
                 token_id=ticket.token_id,
                 token=ticket.token,
-                usage='assigned',
+                usage=UsageEnum.assigned.value,
                 source='assign',
                 matric_number=matric_number,
                 first_name=None,
@@ -403,16 +421,14 @@ def assign_token_to_matric():
                 phone_number=None,
                 faculty=None,
                 department=None,
-                level=None
+                level=None,
             )
             db.session.add(record)
         else:
-            # Update existing record usage/source
-            record.usage = 'assigned'
+            record.usage = UsageEnum.assigned.value
             record.source = 'assign'
 
         ticket.usage = UsageEnum.assigned.value
-
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -438,6 +454,6 @@ def assign_token_to_matric():
         }
     }), 200
 
-# Uncomment for development/testing
+
 # if __name__ == '__main__':
 #     app.run(debug=True)
