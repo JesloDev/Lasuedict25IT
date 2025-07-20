@@ -92,14 +92,10 @@ class Record(db.Model):
 class Ticket(db.Model):
     __tablename__ = 'ticket'
 
-    id = db.Column(db.Integer, nullable=False, autoincrement=True)
+    token = db.Column(db.String(150), primary_key=True)
+    id = db.Column(db.Integer, unique=True, autoincrement=True, nullable=False)
     token_id = db.Column(db.String(150), nullable=False)
-    token = db.Column(db.String(150), nullable=False)
-    usage = db.Column(ENUM(UsageEnum, name='usage_enum', create_type=False), nullable=False)
-
-    __table_args__ = (
-        db.PrimaryKeyConstraint('id', 'token'),
-    )
+    usage = db.Column(db.String(20), nullable=False)
 
 # --- Schemas ---
 # (same as previous code: ReceiptRegSchema, UserLoginSchema, RecordMetadataUpdateSchema, AssignTokenSchema, UploadTicketItemSchema)
