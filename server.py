@@ -447,7 +447,7 @@ def assign_token_to_matric():
 
     if missing_fields:
         return jsonify({
-            'error': 'Cannot assign token. Complete registration first.',
+            'error': 'Cannot assign token. Finish up student registration.',
             'missing_fields': missing_fields
         }), 400
 
