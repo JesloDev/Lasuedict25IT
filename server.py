@@ -102,7 +102,7 @@ class Record(db.Model):
 
     # From Ticket
     token_id = db.Column(db.String(150))
-    token = db.Column(db.String(150))
+    token = db.Column(db.String(150), unique=True) # Add unique=True here
     usage = db.Column(db.String(100))
 
     # Meta
@@ -422,30 +422,38 @@ def assign_token_to_matric():
     if not ticket:
         return jsonify({'error': f'Token "{token_value}" not found.'}), 404
 
-    record = Record.query.filter_by(token=token_value, matric_number=matric_number).first()
-    try:
-        if not record:
-            record = Record(
-                token_id=ticket.token_id,
-                token=ticket.token,
-                usage=UsageEnum.assigned.value,
-                source='assign',
-                matric_number=matric_number,
-                first_name=None,
-                last_name=None,
-                other_name=None,
-                email=None,
-                phone_number=None,
-                faculty=None,
-                department=None,
-                level=None,
-            )
-            db.session.add(record)
-        else:
-            record.usage = UsageEnum.assigned.value
-            record.source = 'assign'
+    record = Record.query.filter_by(matric_number=matric_number).first()
+    if not record:
+        return jsonify({'error': f'Record with matric number "{matric_number}" not found.'}), 404
 
+    # List of fields that must be non-empty/nonnull to allow assignment
+    required_fields = ['first_name', 'last_name', 'email', 'phone_number', 'faculty', 'department', 'level']
+
+    missing_fields = []
+    for field in required_fields:
+        value = getattr(record, field)
+        if value is None or (isinstance(value, str) and value.strip() == ''):
+            missing_fields.append(field)
+
+    if missing_fields:
+        return jsonify({
+            'error': 'Cannot assign token. The following fields are missing or empty in the record:',
+            'missing_fields': missing_fields
+        }), 400
+
+    # If all required fields are present, proceed with assignment
+    try:
+        # Check if record already has the token assigned
+        # If not, create a new Record with token info?
+        # Or update existing record: (Your original code logic)
+        if not record.token or record.token != token_value:
+            record.token_id = ticket.token_id
+            record.token = ticket.token
+
+        record.usage = UsageEnum.assigned.value
+        record.source = 'assign'
         ticket.usage = UsageEnum.assigned.value
+
         db.session.commit()
     except Exception as e:
         db.session.rollback()
