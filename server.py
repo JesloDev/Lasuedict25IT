@@ -434,12 +434,12 @@ def assign_token_to_matric():
 
     record = Record.query.filter_by(matric_number=matric_number).first()
     if not record:
-        return jsonify({'error': f'Record with matric number "{matric_number}" not found.'}), 404
+        return jsonify({'error': f'Record with matric number "{matric_number}" not found. Assignment failed.'}), 404
 
-    # List of fields that must be non-empty/nonnull to allow assignment
+    # Check required fields completeness
     required_fields = ['first_name', 'last_name', 'email', 'phone_number', 'faculty', 'department', 'level']
-
     missing_fields = []
+
     for field in required_fields:
         value = getattr(record, field)
         if value is None or (isinstance(value, str) and value.strip() == ''):
@@ -447,21 +447,16 @@ def assign_token_to_matric():
 
     if missing_fields:
         return jsonify({
-            'error': 'Cannot assign token. The following fields are missing or empty in the record:',
+            'error': 'Cannot assign token. Complete registration first.',
             'missing_fields': missing_fields
         }), 400
 
-    # If all required fields are present, proceed with assignment
     try:
-        # Check if record already has the token assigned
-        # If not, create a new Record with token info?
-        # Or update existing record: (Your original code logic)
-        if not record.token or record.token != token_value:
-            record.token_id = ticket.token_id
-            record.token = ticket.token
-
+        record.token_id = ticket.token_id
+        record.token = ticket.token
         record.usage = UsageEnum.assigned.value
         record.source = 'assign'
+
         ticket.usage = UsageEnum.assigned.value
 
         db.session.commit()
