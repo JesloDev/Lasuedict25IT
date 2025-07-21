@@ -395,11 +395,21 @@ def handle_upload_json_array():
 def get_tickets():
     try:
         tickets = Ticket.query.all()
-        data = [{
-            'token_id': t.token_id,
-            'token': t.token,
-            'usage': t.usage
-        } for t in tickets]
+        data = []
+        for t in tickets:
+            # Try to find assigned record for this token
+            if t.usage == UsageEnum.assigned.value:
+                record = Record.query.filter_by(token=t.token).first()
+                matric_number = record.matric_number if record else ''
+            else:
+                matric_number = ''
+
+            data.append({
+                'token_id': t.token_id,
+                'token': t.token,
+                'usage': t.usage,
+                'matric_number': matric_number
+            })
         return jsonify(data), 200
     except Exception as e:
         app.logger.error(f"Ticket fetch error: {e}")
