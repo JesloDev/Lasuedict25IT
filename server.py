@@ -428,35 +428,63 @@ def assign_token_to_matric():
     matric_number = validated['matric_number']
     token_value = validated['token']
 
+    # 1. Check if token exists and is available
     ticket = Ticket.query.filter_by(token=token_value).first()
     if not ticket:
         return jsonify({'error': f'Token "{token_value}" not found.'}), 404
+    if ticket.usage == UsageEnum.assigned.value:
+        return jsonify({'error': f'Token "{token_value}" is already assigned.'}), 409
 
-    record = Record.query.filter_by(matric_number=matric_number).first()
-    if not record:
-        return jsonify({'error': f'Record with matric number "{matric_number}" not found. Assignment failed.'}), 404
+    # 2. Find a Record for the matric_number that ISN'T fully filled and doesn't have a token
+    # Order by ID to potentially pick the oldest or first-created incomplete record
+    records_for_matric = Record.query.filter_by(matric_number=matric_number).order_by(Record.id.asc()).all()
 
-    # Check required fields completeness
-    required_fields = ['first_name', 'last_name', 'email', 'phone_number', 'faculty', 'department', 'level']
-    missing_fields = []
+    if not records_for_matric:
+        return jsonify({'error': f'No record found for matric number "{matric_number}". Assignment failed.'}), 404
 
-    for field in required_fields:
-        value = getattr(record, field)
-        if value is None or (isinstance(value, str) and value.strip() == ''):
-            missing_fields.append(field)
+    assignable_record = None
+    required_fields_for_full_record = [
+        'first_name', 'last_name', 'email', 'phone_number',
+        'faculty', 'department', 'level'
+    ]
 
-    if missing_fields:
+    for rec in records_for_matric:
+        # Check if the record already has a token assigned
+        if rec.token is not None and rec.token != '':
+            continue # Skip this record, it already has a token
+
+        # Check if the record is 'complete' (has all required fields filled)
+        is_complete = True
+        for field in required_fields_for_full_record:
+            value = getattr(rec, field)
+            if value is None or (isinstance(value, str) and value.strip() == ''):
+                is_complete = False
+                break # This record is not complete
+
+        if not is_complete:
+            # This is an incomplete record and doesn't have a token, so we can assign to it
+            assignable_record = rec
+            break
+        # If it is complete and has no token, it is also a candidate
+        elif rec.token is None or rec.token == '':
+             assignable_record = rec
+             break
+
+
+    if not assignable_record:
         return jsonify({
-            'error': 'Cannot assign token. Finish up student registration.',
-            'missing_fields': missing_fields
-        }), 400
+            'error': f'All records for matric number "{matric_number}" are already fully registered or have a token assigned.'
+        }), 409
+
 
     try:
-        record.token_id = ticket.token_id
-        record.token = ticket.token
-        record.usage = UsageEnum.assigned.value
-        record.source = 'assign'
+        # Assign token to the found record
+        assignable_record.token_id = ticket.token_id
+        assignable_record.token = ticket.token
+        assignable_record.usage = UsageEnum.assigned.value
+        assignable_record.source = 'assign' # Or 'manual_assignment' if applicable
 
+        # Update the ticket status
         ticket.usage = UsageEnum.assigned.value
 
         db.session.commit()
@@ -474,13 +502,13 @@ def assign_token_to_matric():
             'usage': ticket.usage
         },
         'updated_record': {
-            'id': record.id,
-            'matric_number': record.matric_number,
-            'usage': record.usage,
-            'token': record.token,
-            'token_id': record.token_id,
-            'source': record.source,
-            'timestamp': record.timestamp.isoformat() if record.timestamp else None
+            'id': assignable_record.id,
+            'matric_number': assignable_record.matric_number,
+            'usage': assignable_record.usage,
+            'token': assignable_record.token,
+            'token_id': assignable_record.token_id,
+            'source': assignable_record.source,
+            'timestamp': assignable_record.timestamp.isoformat() if assignable_record.timestamp else None
         }
     }), 200
 
