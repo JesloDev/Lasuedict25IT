@@ -1,29 +1,46 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
 import os
 import enum
 from werkzeug.security import generate_password_hash, check_password_hash
-from marshmallow import Schema, fields, validate, ValidationError
-from marshmallow import EXCLUDE
+from marshmallow import Schema, fields, validate, ValidationError, EXCLUDE
 import traceback
 
 # --- App Initialization ---
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', '!@#$%^&*()1234567890qwertyUIOP')
 
+# Enable cookies to be sent cross-site (SameSite=None) and secure flag enabled
+app.config.update(
+    SESSION_COOKIE_SAMESITE='None',
+    SESSION_COOKIE_SECURE=True  # Must be True when SameSite=None to work in modern browsers
+)
+
+
 # --- Database Configuration ---
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///dev.db')  # fallback for dev
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-CORS(app, supports_credentials=True, origins=["https://lasued-ticketer.vercel.app", "http://localhost:5173"])
-# CORS(app)
+
+# CORS setup supporting credentials with specific allowed origins
+CORS(
+    app,
+    supports_credentials=True,
+    origins=["https://lasued-ticketer.vercel.app", "http://localhost:5173"]
+)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'user_login'
+
+
+# --- Unauthorized handler to avoid redirect (returns JSON 401) ---
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    return jsonify({'error': 'Authentication required'}), 401
 
 
 # --- Models ---
@@ -379,7 +396,6 @@ def get_tickets():
     try:
         tickets = Ticket.query.all()
         data = [{
-            # 'id': t.id, # Removed since id column dropped
             'token_id': t.token_id,
             'token': t.token,
             'usage': t.usage
@@ -456,5 +472,6 @@ def assign_token_to_matric():
     }), 200
 
 
+# Uncomment to run locally with debugging:
 # if __name__ == '__main__':
 #     app.run(debug=True)
