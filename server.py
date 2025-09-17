@@ -525,12 +525,17 @@ def init_db():
         # Create admin user if not exists
         c.execute("SELECT * FROM users WHERE username='admin'")
         if not c.fetchone():
-            admin_pass_hash = generate_password_hash('adminpassword')
+            admin_pass_hash = generate_password_hash('admin')
             c.execute('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)',
-                      ('PF001', 'admin', admin_pass_hash, 'admin'))
+                      ('PF001', 'admin', admin_pass_hash, 'superadmin'))
         conn.commit()
 
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
+# if __name__ == '__main__':
+#     init_db()
+#     app.run(debug=True)

@@ -2,19 +2,18 @@
 services:
   - type: web
     name: Lasuedict25IT
-    runtime: python
+    env: python
     repo: https://github.com/JesloDev/Lasuedict25IT
-    branch: master  # Use 'main' instead of 'master' if applicable
+    branch: master  # Change to 'main' if your default branch is main
     plan: free
     region: oregon
 
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn server:app  # Assuming your Flask app is in app.py
+    startCommand: gunicorn server:app  # Replace 'server' with your actual Flask app filename without .py extension
 
     envVars:
       - key: SECRET_KEY
         sync: false
-
       - key: DATABASE_URL
         sync: false
 
