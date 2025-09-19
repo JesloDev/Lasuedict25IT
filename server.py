@@ -481,58 +481,58 @@ def assign_token_to_matric():
     }), 200
 
 
-# --- Database initialization ---
-def init_db():
-    with sqlite3.connect(DATABASE) as conn:
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS users (
-                        id TEXT PRIMARY KEY,
-                        username TEXT UNIQUE NOT NULL,
-                        password_hash TEXT NOT NULL,
-                        role TEXT NOT NULL
-                    )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS receipt_reg (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        first_name TEXT NOT NULL,
-                        last_name TEXT NOT NULL,
-                        other_name TEXT,
-                        matric_number TEXT UNIQUE NOT NULL,
-                        email TEXT NOT NULL,
-                        phone_number TEXT NOT NULL
-                    )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS record (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        first_name TEXT,
-                        last_name TEXT,
-                        other_name TEXT,
-                        matric_number TEXT,
-                        email TEXT,
-                        phone_number TEXT,
-                        faculty TEXT,
-                        department TEXT,
-                        level TEXT,
-                        token_id TEXT,
-                        token TEXT UNIQUE,
-                        usage TEXT,
-                        source TEXT,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS ticket (
-                        token TEXT PRIMARY KEY,
-                        token_id TEXT NOT NULL,
-                        usage TEXT NOT NULL
-                    )''')
-        # Create admin user if not exists
-        c.execute("SELECT * FROM users WHERE username='admin'")
-        if not c.fetchone():
-            admin_pass_hash = generate_password_hash('admin')
-            c.execute('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)',
-                      ('PF001', 'admin', admin_pass_hash, 'superadmin'))
-        conn.commit()
+# # --- Database initialization ---
+# def init_db():
+#     with sqlite3.connect(DATABASE) as conn:
+#         c = conn.cursor()
+#         c.execute('''CREATE TABLE IF NOT EXISTS users (
+#                         id TEXT PRIMARY KEY,
+#                         username TEXT UNIQUE NOT NULL,
+#                         password_hash TEXT NOT NULL,
+#                         role TEXT NOT NULL
+#                     )''')
+#         c.execute('''CREATE TABLE IF NOT EXISTS receipt_reg (
+#                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                         first_name TEXT NOT NULL,
+#                         last_name TEXT NOT NULL,
+#                         other_name TEXT,
+#                         matric_number TEXT UNIQUE NOT NULL,
+#                         email TEXT NOT NULL,
+#                         phone_number TEXT NOT NULL
+#                     )''')
+#         c.execute('''CREATE TABLE IF NOT EXISTS record (
+#                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                         first_name TEXT,
+#                         last_name TEXT,
+#                         other_name TEXT,
+#                         matric_number TEXT,
+#                         email TEXT,
+#                         phone_number TEXT,
+#                         faculty TEXT,
+#                         department TEXT,
+#                         level TEXT,
+#                         token_id TEXT,
+#                         token TEXT UNIQUE,
+#                         usage TEXT,
+#                         source TEXT,
+#                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+#                     )''')
+#         c.execute('''CREATE TABLE IF NOT EXISTS ticket (
+#                         token TEXT PRIMARY KEY,
+#                         token_id TEXT NOT NULL,
+#                         usage TEXT NOT NULL
+#                     )''')
+#         # Create admin user if not exists
+#         c.execute("SELECT * FROM users WHERE username='admin'")
+#         if not c.fetchone():
+#             admin_pass_hash = generate_password_hash('admin')
+#             c.execute('INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)',
+#                       ('PF001', 'admin', admin_pass_hash, 'superadmin'))
+#         conn.commit()
 
 
 if __name__ == '__main__':
-    init_db()
+    # init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
 
