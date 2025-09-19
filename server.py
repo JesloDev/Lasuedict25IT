@@ -21,8 +21,8 @@ app.config.update(
     SESSION_COOKIE_SECURE=True
 )
 
-CORS(app)
-# CORS(app, supports_credentials=True, origins=["https://lasued-ticketer.vercel.app", "http://localhost:5173"])
+# CORS(app)
+CORS(app, supports_credentials=True, origins=["https://lasued-ticketer.vercel.app", "http://localhost:5173"])
 
 login_manager = LoginManager()
 login_manager.init_app(app)
